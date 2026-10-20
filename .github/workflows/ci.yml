@@ -1,0 +1,75 @@
+name: Scientific checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: python -m pip install '.[test,benchmark,edf]'
+      - name: Run scientific and validation tests
+        run: python -m pytest -q --cov=mindbench --cov-fail-under=90
+      - name: Synthetic group-isolated baselines and fusion
+        run: |
+          mindbench benchmark --output /tmp/mindbench-benchmark --subjects 16 --trials 16 --bootstrap 50
+          python - <<'PYCI'
+          import json
+          with open('/tmp/mindbench-benchmark/benchmark.json', encoding='utf-8') as f: report=json.load(f)
+          train, cal, test = [set(report['subjects'][k]) for k in ('train','calibration','test')]
+          assert not (train & cal or train & test or cal & test)
+          assert report['audit']['subject_leakage'] is False
+          assert len(report['results']) == 5
+          PYCI
+      - name: Synthetic roundtrip
+        run: |
+          mindbench synthetic --output /tmp/mindbench-eeg
+          mindbench audit --root /tmp/mindbench-eeg --output /tmp/mindbench-report --subject 01 --session 01 --task oddball --run 01
+          python -c 'import json; m=json.load(open("/tmp/mindbench-report/manifest.json")); assert m["eeg"]["n_samples"] == 300; assert m["synchronization_audit"]["hardware_sync_verified"] is False'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: synthetic-audit-py${{ matrix.python-version }}
+          path: |
+            /tmp/mindbench-report/
+            /tmp/mindbench-benchmark/
+          if-no-files-found: ignore
+  edf-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install optional EDF reader
+        run: python -m pip install '.[test,edf,benchmark]'
+      - name: Test synthetic EDF adapter via MNE
+        run: python -m pytest -q tests/test_edf.py
+
+  browser-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install dashboard and headless browser test dependencies
+        run: |
+          python -m pip install '.[test,benchmark,edf]' 'playwright>=1.54,<2'
+          python -m playwright install --with-deps chromium
+      - name: Test real browser interactions and mobile viewport
+        run: MINDBENCH_REQUIRE_BROWSER=1 python -m pytest -q tests/test_dashboard_browser.py

@@ -1,0 +1,23 @@
+{
+  "report_schema": "mindbench-local-qa-v1",
+  "date": "2026-10-20",
+  "environment": "ChatGPT hosted container; Python 3.13.5",
+  "test_command": "MINDBENCH_REQUIRE_BROWSER=1 PYTHONPATH=src python -m pytest -q --cov=mindbench --cov-fail-under=90 --cov-report=term",
+  "tests_passed": 71,
+  "tests_failed": 0,
+  "tests_skipped": 0,
+  "test_wall_seconds_observed": 5.77,
+  "covered_statements": 788,
+  "total_statements": 859,
+  "coverage_percent": 91.73,
+  "minimum_coverage_percent": 90,
+  "chromium_browser_tests_passed": 2,
+  "python311_ast_parse": true,
+  "python311_execution_verified": false,
+  "wheel_build_and_installed_synthetic_cli_smoke": true,
+  "dataset_kind": "synthetic_only",
+  "actual_github_actions_runs_verified": false,
+  "real_dataset_validated": false,
+  "release": false,
+  "limitations": "Passing local automated tests do not establish clinical validity, rights to empirical data, hardware synchronization, hosted-CI evidence or approval to publish."
+}
